@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/tidwall/murmur3"
@@ -26,6 +27,9 @@ type Options struct {
 	InitialSize int
 	// Shrinkable allows the map to shrink. Default is false
 	Shrinkable bool
+	// StableSeed force seed to stay the same between resizes.
+	// Default 0 which means it's turned off.
+	StableSeed uint32
 	// HashFn is an custom hash function
 	HashFn func(key string, seed uint32) (hash uint32)
 }
@@ -37,6 +41,7 @@ type Map struct {
 	init       int
 	len        int
 	seed       uint32
+	stable     uint32
 	entries    []entry
 	hashFn     func(key string, seed uint32) (hash uint32)
 }
@@ -49,6 +54,7 @@ func New(opts *Options) *Map {
 		initialSize = opts.InitialSize
 		m.shrinkable = opts.Shrinkable
 		m.hashFn = opts.HashFn
+		m.stable = opts.StableSeed
 	}
 	m.init = initialSize
 	if initialSize <= 0 {
@@ -58,7 +64,11 @@ func New(opts *Options) *Map {
 	for n < initialSize {
 		n *= 2
 	}
-	atomic.StoreUint32(&m.seed, makeSeed())
+	if m.stable == 0 {
+		atomic.StoreUint32(&m.seed, makeSeed())
+	} else {
+		atomic.StoreUint32(&m.seed, m.stable)
+	}
 	m.entries = make([]entry, n)
 	m.mask = len(m.entries) - 1
 	return m
@@ -86,19 +96,27 @@ func (m *Map) Hash(key string) (hash, seed uint32) {
 }
 
 func (m *Map) grow() {
+	println("grow")
+	start := time.Now()
 	var opts Options
 	opts.InitialSize = len(m.entries) * 2
 	opts.Shrinkable = m.shrinkable
 	opts.HashFn = m.hashFn
+	opts.StableSeed = m.stable
 	nmap := New(&opts)
 	for i := 0; i < len(m.entries); i++ {
 		if m.entries[i].dist > 0 {
-			nmap.Set(m.entries[i].key, m.entries[i].value)
+			if m.stable == 0 {
+				nmap.Set(m.entries[i].key, m.entries[i].value)
+			} else {
+				nmap.SetWithHint(m.entries[i].key, m.entries[i].hash, m.stable, m.entries[i].value)
+			}
 		}
 	}
 	init := m.init
 	*m = *nmap
 	m.init = init
+	println(time.Since(start).String())
 }
 
 func (m *Map) shrink() {
@@ -106,10 +124,15 @@ func (m *Map) shrink() {
 	opts.InitialSize = m.len
 	opts.Shrinkable = m.shrinkable
 	opts.HashFn = m.hashFn
+	opts.StableSeed = m.stable
 	nmap := New(&opts)
 	for i := 0; i < len(m.entries); i++ {
 		if m.entries[i].dist > 0 {
-			nmap.Set(m.entries[i].key, m.entries[i].value)
+			if m.stable == 0 {
+				nmap.Set(m.entries[i].key, m.entries[i].value)
+			} else {
+				nmap.SetWithHint(m.entries[i].key, m.entries[i].hash, m.stable, m.entries[i].value)
+			}
 		}
 	}
 	init := m.init
@@ -130,7 +153,11 @@ func (m *Map) Set(key string, value unsafe.Pointer) (unsafe.Pointer, bool) {
 // Returns the previous value, or false when no value was assigned.
 func (m *Map) SetWithHint(key string, hash, seed uint32, value unsafe.Pointer) (unsafe.Pointer, bool) {
 	if len(m.entries) == 0 {
-		atomic.StoreUint32(&m.seed, makeSeed())
+		if m.stable == 0 {
+			atomic.StoreUint32(&m.seed, makeSeed())
+		} else {
+			atomic.StoreUint32(&m.seed, m.stable)
+		}
 		m.entries = make([]entry, 1)
 	}
 	if atomic.LoadUint32(&m.seed) != seed {
