@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"sync/atomic"
-	"time"
 	"unsafe"
 
 	"github.com/tidwall/murmur3"
@@ -96,8 +95,6 @@ func (m *Map) Hash(key string) (hash, seed uint32) {
 }
 
 func (m *Map) grow() {
-	println("grow")
-	start := time.Now()
 	var opts Options
 	opts.InitialSize = len(m.entries) * 2
 	opts.Shrinkable = m.shrinkable
@@ -116,7 +113,6 @@ func (m *Map) grow() {
 	init := m.init
 	*m = *nmap
 	m.init = init
-	println(time.Since(start).String())
 }
 
 func (m *Map) shrink() {
