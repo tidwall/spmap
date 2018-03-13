@@ -136,7 +136,7 @@ func (m *Map) shrink() {
 	m.init = init
 }
 
-// Set assigns a value to a key. A nil value will panic.
+// Set assigns a value to a key.
 // Returns the previous value, or false when no value was assigned.
 func (m *Map) Set(key string, value unsafe.Pointer) (unsafe.Pointer, bool) {
 	hash, seed := m.Hash(key)
