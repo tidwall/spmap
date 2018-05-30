@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/tidwall/lotsa"
 	"github.com/tidwall/spinlock"
@@ -45,15 +44,15 @@ func random(N int, perm bool) []string {
 	return strs
 }
 
-func ps(p unsafe.Pointer) string {
+func ps(p interface{}) string {
 	if p == nil {
 		return "<nil>"
 	}
-	return *(*string)(p)
+	return p.(string)
 }
 
-func sp(s string) unsafe.Pointer {
-	return unsafe.Pointer(&s)
+func sp(s string) interface{} {
+	return s
 }
 
 func shuffle(strs []string) {
@@ -171,14 +170,14 @@ func TestRandomData(t *testing.T) {
 		if m.Len() != N/2 {
 			t.Fatalf("expected %v, got %v", N/2, m.Len())
 		}
-		m.Scan(func(key string, value unsafe.Pointer) bool {
+		m.Scan(func(key string, value interface{}) bool {
 			if ps(value) != addstr(key, 1) {
 				t.Fatalf("expected %v, got %v", addstr(key, 1), ps(value))
 			}
 			return true
 		})
 		var n int
-		m.Scan(func(key string, value unsafe.Pointer) bool {
+		m.Scan(func(key string, value interface{}) bool {
 			n++
 			return false
 		})
@@ -201,9 +200,9 @@ func TestBench(t *testing.T) {
 		return
 	}
 	strs := random(int(N), false)
-	var pstrs []unsafe.Pointer
+	var pstrs []interface{}
 	for i := range strs {
-		pstrs = append(pstrs, unsafe.Pointer(&strs[i]))
+		pstrs = append(pstrs, interface{}(&strs[i]))
 	}
 	// t.Run("RobinHoodHintsThreads", func(t *testing.T) {
 	// 	testPerf(strs, pstrs, "robinhood-hints")
@@ -242,7 +241,7 @@ func printItem(s string, size int, dir int) {
 // 	return a.key < b.(kvitemT).key
 // }
 
-func testPerf(strs []string, pstrs []unsafe.Pointer, which string) {
+func testPerf(strs []string, pstrs []interface{}, which string) {
 	var ms1, ms2 runtime.MemStats
 	initSize := len(strs) * 2
 	threads := 1
@@ -260,7 +259,7 @@ func testPerf(strs []string, pstrs []unsafe.Pointer, which string) {
 	var scnop func()
 	switch which {
 	case "stdlib":
-		m := make(map[string]unsafe.Pointer, initSize)
+		m := make(map[string]interface{}, initSize)
 		setop = func(i, _ int) { m[strs[i]] = pstrs[i] }
 		getop = func(i, _ int) { _ = m[strs[i]] }
 		delop = func(i, _ int) { delete(m, strs[i]) }
@@ -270,7 +269,7 @@ func testPerf(strs []string, pstrs []unsafe.Pointer, which string) {
 		}
 	case "stdlib-threads":
 		threads = 4
-		m := make(map[string]unsafe.Pointer, initSize)
+		m := make(map[string]interface{}, initSize)
 		var mu spinlock.Locker
 		setop = func(i, _ int) {
 			mu.Lock()
@@ -301,7 +300,7 @@ func testPerf(strs []string, pstrs []unsafe.Pointer, which string) {
 		getop = func(i, _ int) { m.Get(strs[i]) }
 		delop = func(i, _ int) { m.Delete(strs[i]) }
 		scnop = func() {
-			m.Scan(func(key string, value unsafe.Pointer) bool {
+			m.Scan(func(key string, value interface{}) bool {
 				return true
 			})
 		}
@@ -336,7 +335,7 @@ func testPerf(strs []string, pstrs []unsafe.Pointer, which string) {
 		}
 		scnop = func() {
 			mu.Lock()
-			m.Scan(func(key string, value unsafe.Pointer) bool {
+			m.Scan(func(key string, value interface{}) bool {
 				return true
 			})
 			mu.Unlock()

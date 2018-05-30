@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/tidwall/murmur3"
 )
@@ -17,7 +16,7 @@ type entry struct {
 	dist  uint32
 	hash  uint32
 	key   string
-	value unsafe.Pointer
+	value interface{}
 }
 
 // Options for Map
@@ -33,7 +32,7 @@ type Options struct {
 	HashFn func(key string, seed uint32) (hash uint32)
 }
 
-// Map is a hashmap. Like map[string]unsafe.Pointer
+// Map is a hashmap. Like map[string]interface{}
 type Map struct {
 	shrinkable bool
 	mask       int
@@ -138,7 +137,7 @@ func (m *Map) shrink() {
 
 // Set assigns a value to a key.
 // Returns the previous value, or false when no value was assigned.
-func (m *Map) Set(key string, value unsafe.Pointer) (unsafe.Pointer, bool) {
+func (m *Map) Set(key string, value interface{}) (interface{}, bool) {
 	hash, seed := m.Hash(key)
 	return m.SetWithHint(key, hash, seed, value)
 }
@@ -147,7 +146,7 @@ func (m *Map) Set(key string, value unsafe.Pointer) (unsafe.Pointer, bool) {
 // The hash/seed params must be previous generated from the Hash function
 // sharing the same key. Doing otherwise will risk corruption to map.
 // Returns the previous value, or false when no value was assigned.
-func (m *Map) SetWithHint(key string, hash, seed uint32, value unsafe.Pointer) (unsafe.Pointer, bool) {
+func (m *Map) SetWithHint(key string, hash, seed uint32, value interface{}) (interface{}, bool) {
 	if len(m.entries) == 0 {
 		if m.stable == 0 {
 			atomic.StoreUint32(&m.seed, makeSeed())
@@ -199,7 +198,7 @@ func (m *Map) SetWithHint(key string, hash, seed uint32, value unsafe.Pointer) (
 
 // Get returns a value for a key.
 // Returns false when no value has been assign for key.
-func (m *Map) Get(key string) (unsafe.Pointer, bool) {
+func (m *Map) Get(key string) (interface{}, bool) {
 	hash, seed := m.Hash(key)
 	return m.GetWithHint(key, hash, seed)
 }
@@ -208,7 +207,7 @@ func (m *Map) Get(key string) (unsafe.Pointer, bool) {
 // The hash/seed params must be previous generated from the Hash function
 // sharing the same key. Doing otherwise will risk corruption to map.
 // Returns false when no value has been assign for key.
-func (m *Map) GetWithHint(key string, hash, seed uint32) (unsafe.Pointer, bool) {
+func (m *Map) GetWithHint(key string, hash, seed uint32) (interface{}, bool) {
 	if len(m.entries) == 0 {
 		return nil, false
 	}
@@ -238,7 +237,7 @@ func (m *Map) Len() int {
 
 // Delete deletes a value for a key.
 // Returns the deleted value, or false when no value was assigned.
-func (m *Map) Delete(key string) (unsafe.Pointer, bool) {
+func (m *Map) Delete(key string) (interface{}, bool) {
 	hash, seed := m.Hash(key)
 	return m.DeleteWithHint(key, hash, seed)
 }
@@ -247,7 +246,7 @@ func (m *Map) Delete(key string) (unsafe.Pointer, bool) {
 // The hash/seed params must be previous generated from the Hash function
 // sharing the same key. Doing otherwise will risk corruption to map.
 // Returns the deleted value, or false when no value was assigned.
-func (m *Map) DeleteWithHint(key string, hash, seed uint32) (unsafe.Pointer, bool) {
+func (m *Map) DeleteWithHint(key string, hash, seed uint32) (interface{}, bool) {
 	if len(m.entries) == 0 {
 		return nil, false
 	}
@@ -290,7 +289,7 @@ func (m *Map) DeleteWithHint(key string, hash, seed uint32) (unsafe.Pointer, boo
 
 // Scan iterates through all values.
 // It's not safe to call or Set or Delete while scanning.
-func (m *Map) Scan(iter func(key string, value unsafe.Pointer) bool) {
+func (m *Map) Scan(iter func(key string, value interface{}) bool) {
 	for i := 0; i < len(m.entries); i++ {
 		if m.entries[i].dist > 0 {
 			if !iter(m.entries[i].key, m.entries[i].value) {

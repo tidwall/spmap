@@ -4,7 +4,7 @@
 
 A hashmap for Go that uses crypto random seeds, [hash hints](#hash-hints), [open addressing](https://en.wikipedia.org/wiki/Hash_table#Open_addressing), and [robin hood hashing](https://en.wikipedia.org/wiki/Hash_table#Robin_Hood_hashing).
 
-It's a very specialized map that is similar to `map[string]unsafe.Pointer`.
+It's a very specialized map that is similar to `map[string]interface{}`.
 
 # Getting Started
 
