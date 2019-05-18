@@ -1,3 +1,5 @@
+## *This project is obsolete. Please use the [`rhh`](https://github.com/tidwall/rhh) package instead*
+
 # `spmap`
 
 [![GoDoc](https://img.shields.io/badge/api-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/tidwall/spmap)
